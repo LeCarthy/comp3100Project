@@ -57,6 +57,8 @@ public class DSClient {
 	BufferedReader m_in = null;
 	DataOutputStream m_out = null;
 	ArrayList<ServerListEntry> m_server_list = new ArrayList<ServerListEntry>();
+	int m_lrr_idx = 0;
+	ArrayList<ServerListEntry> m_lrr_servers = null;
 
 	public DSClient() {
 	}
@@ -123,19 +125,43 @@ public class DSClient {
 		send_and_wait("OK");
 	}
 
-	public ServerListEntry get_lrr() {
-		if (m_server_list.size() <= 0)
-			return null;
+	private ArrayList<ServerListEntry> get_lrr_servers() {
+		ArrayList<ServerListEntry> servers = new ArrayList<ServerListEntry>();
 
-		// dumb
-		ServerListEntry server = m_server_list.get(0);
-		for (ServerListEntry serverListEntry : m_server_list) {
-			if (!server.m_type.equals(serverListEntry.m_type)) {
-				server = serverListEntry;
-			} else if (server.m_jobs_running > serverListEntry.m_jobs_running) {
-				server = serverListEntry;
+		// find the largest type
+		ServerListEntry largest_type = m_server_list.get(0);
+		for (int i = 0; i < m_server_list.size(); ++i) {
+			if (largest_type.m_core < m_server_list.get(i).m_core)
+				largest_type = m_server_list.get(i);
+		}
+
+		for (ServerListEntry server : m_server_list) {
+			if (largest_type.m_type.equals(server.m_type)) {
+				servers.add(server);
 			}
 		}
+
+		return servers;
+	}
+
+	public ServerListEntry get_lrr() {
+
+		if (m_server_list.size() == 0)
+			return null;
+
+		// if we don't have a list of largest servers, create one
+		if (m_lrr_servers == null) {
+			m_lrr_servers = get_lrr_servers();
+		}
+
+		// TODO update server statuses
+
+		ServerListEntry server = m_lrr_servers.get(m_lrr_idx);
+		if( ++m_lrr_idx >= m_lrr_servers.size())
+		{
+			m_lrr_idx = 0;
+		}
+
 		return server;
 	}
 
