@@ -4,6 +4,7 @@ import java.util.ArrayList;
 
 public class DSClient {
 
+	// Class for data recieved from GETS
 	public class ServerListEntry {
 		public String m_type;
 		public int m_id;
@@ -29,6 +30,7 @@ public class DSClient {
 		}
 	}
 
+	// Class for data recieved from JOBN
 	public class ServerJob {
 		public int m_submitTime;
 		public int m_id;
@@ -48,6 +50,10 @@ public class DSClient {
 		}
 	}
 
+	enum AlgorthimType {
+		ALG_LRR
+	}
+
 	static final String SERVER_IP = "localhost";
 	static final int SERVER_PORT = 50000;
 
@@ -65,8 +71,16 @@ public class DSClient {
 
 	public String send_and_wait(String send) throws IOException {
 		String send_string = send + "\n";
+
+		if (DEBUG)
+			System.out.println(String.format("JAVA SENT %s", send));
+
 		m_out.write(send_string.getBytes());
-		return m_in.readLine();
+		String rcvd_string = m_in.readLine();
+
+		if (DEBUG)
+			System.out.println(String.format("JAVA RCVD %s", rcvd_string));
+		return rcvd_string;
 	}
 
 	private void error_mismatch(String expected, String actual) {
@@ -81,13 +95,15 @@ public class DSClient {
 		m_out = new DataOutputStream(m_socket.getOutputStream());
 	}
 
-	public int initialise_connection() throws IOException {
+	// Greet the server and authorise connection
+	public int connection_handshake() throws IOException {
 		String response = send_and_wait("HELO");
 		if (!response.equals("OK")) {
 			error_mismatch("OK", response);
 			return 2;
 		}
 
+		// Authorise with the current system username
 		String username = System.getProperty("user.name");
 		response = send_and_wait(String.format("AUTH %s", username));
 		if (!response.equals("OK")) {
@@ -95,6 +111,7 @@ public class DSClient {
 			return 1;
 		}
 
+		System.out.println("Started and initialised connection");
 		return 0;
 	}
 
@@ -107,7 +124,7 @@ public class DSClient {
 		m_socket.close();
 	}
 
-	public void collect_server_entries(ServerJob job) throws IOException {
+	public void find_capable_servers(ServerJob job) throws IOException {
 		m_server_list.clear();
 		String get_query = String.format("GETS Capable %d %d %d", job.m_core, job.m_memory, job.m_disk);
 		String response = send_and_wait(get_query);
@@ -117,61 +134,71 @@ public class DSClient {
 		String[] data = response.split("\\s+");
 		int record_count = Integer.parseInt(data[1]);
 
+		// send_and_wait only returns readline so we need to write and read each line proper
 		m_out.write(("OK\n").getBytes());
 		for (int i = 0; i < record_count; ++i) {
 			m_server_list.add(new ServerListEntry(m_in.readLine()));
 		}
-		// why
+
+		// tell the server we've recieved the list
 		send_and_wait("OK");
 	}
 
-	private ArrayList<ServerListEntry> get_lrr_servers() {
-		ArrayList<ServerListEntry> servers = new ArrayList<ServerListEntry>();
+	private ServerListEntry get_server_lrr() {
+		// if we don't have a list of largest servers, create one
+		if (m_lrr_servers == null) {
+			m_lrr_servers = new ArrayList<ServerListEntry>();
 
-		// find the largest type
-		ServerListEntry largest_type = m_server_list.get(0);
-		for (int i = 0; i < m_server_list.size(); ++i) {
-			if (largest_type.m_core < m_server_list.get(i).m_core)
-				largest_type = m_server_list.get(i);
-		}
+			// find the largest type
+			ServerListEntry largest_type = m_server_list.get(0);
+			for (int i = 0; i < m_server_list.size(); ++i) {
+				if (largest_type.m_core < m_server_list.get(i).m_core)
+					largest_type = m_server_list.get(i);
+			}
 
-		for (ServerListEntry server : m_server_list) {
-			if (largest_type.m_type.equals(server.m_type)) {
-				servers.add(server);
+			for (ServerListEntry server : m_server_list) {
+				if (largest_type.m_type.equals(server.m_type)) {
+					m_lrr_servers.add(server);
+				}
 			}
 		}
 
-		return servers;
-	}
-
-	public ServerListEntry get_lrr() {
-
-		if (m_server_list.size() == 0)
-			return null;
-
-		// if we don't have a list of largest servers, create one
-		if (m_lrr_servers == null) {
-			m_lrr_servers = get_lrr_servers();
-		}
-
-		// TODO update server statuses
-
-		ServerListEntry server = m_lrr_servers.get(m_lrr_idx);
-		if( ++m_lrr_idx >= m_lrr_servers.size())
-		{
+		// return our current server
+		ServerListEntry server = m_lrr_servers.get(m_lrr_idx++);
+		if (m_lrr_idx >= m_lrr_servers.size()) {
 			m_lrr_idx = 0;
 		}
 
 		return server;
 	}
 
-	public void schedule_lrr(String job_str) throws IOException {
+	private ServerListEntry get_server(AlgorthimType alg) {
+
+		if (m_server_list.size() == 0)
+			return null;
+
+		ServerListEntry server = null;
+		switch (alg) {
+			case ALG_LRR:
+				server = get_server_lrr();
+				break;
+			default:
+				System.out.println("Unhandled Algorithm type");
+				break;
+		}
+
+		return server;
+	}
+
+	public void schedule_job(String job_str, AlgorthimType alg) throws IOException {
 		ServerJob job = new ServerJob(job_str);
 
-		// find a capable server
-		collect_server_entries(job);
-		ServerListEntry serv = get_lrr();
+		find_capable_servers(job);
+		// get the latest server based on our chosen algorithm
+		ServerListEntry serv = get_server(alg);
+
 		if (serv != null) {
+			// Send the schedule request
 			send_and_wait(String.format("SCHD %d %s %d", job.m_id, serv.m_type, serv.m_id));
 		}
 	}
@@ -180,21 +207,17 @@ public class DSClient {
 
 		DSClient client = new DSClient();
 		client.connect();
-		if (client.initialise_connection() != 0) {
+		if (client.connection_handshake() != 0) {
 			client.shutdown();
 			return;
 		}
-		System.out.println("Started and initialised connection");
 
 		String response = client.send_and_wait("REDY");
-
 		while (!response.equals("NONE")) {
-			if (response.startsWith("JCPL")) {
-			} else if (response.startsWith("JOBN")) {
-
-				// client.collect_server_records();
-				client.schedule_lrr(response);
-
+			if (response.startsWith("JCPL")) { // Job completion msg
+				// TODO nothing?
+			} else if (response.startsWith("JOBN")) { // Job to be scheduled
+				client.schedule_job(response, AlgorthimType.ALG_LRR);
 			}
 			response = client.send_and_wait("REDY");
 		}
