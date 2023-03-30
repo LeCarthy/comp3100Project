@@ -57,7 +57,7 @@ public class DSClient {
 	static final String SERVER_IP = "localhost";
 	static final int SERVER_PORT = 50000;
 
-	static final boolean DEBUG = true;
+	static final boolean DEBUG = false;
 
 	Socket m_socket = null;
 	BufferedReader m_in = null;
