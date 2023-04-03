@@ -58,6 +58,7 @@ public class DSClient {
 	static final int SERVER_PORT = 50000;
 
 	static final boolean DEBUG = false;
+	static final boolean PERFECT_WORLD = true; // 100% trust that the servers will be available
 
 	Socket m_socket = null;
 	BufferedReader m_in = null;
@@ -116,7 +117,10 @@ public class DSClient {
 	}
 
 	public void disconnect() throws IOException {
-		send_and_wait("QUIT");
+		String quit_response = send_and_wait("QUIT");
+		if (!quit_response.equals("OK")) {
+			error_mismatch("QUIT", quit_response);
+		}
 	}
 
 	public void shutdown() throws IOException {
@@ -124,7 +128,11 @@ public class DSClient {
 		m_socket.close();
 	}
 
-	public void find_capable_servers(ServerJob job) throws IOException {
+	private void find_capable_servers(ServerJob job) throws IOException {
+		// In a perfect world the servers are always healthy, don't query the server.
+		if( PERFECT_WORLD && !m_server_list.isEmpty() )
+			return;
+		
 		m_server_list.clear();
 		String get_query = String.format("GETS Capable %d %d %d", job.m_core, job.m_memory, job.m_disk);
 		String response = send_and_wait(get_query);
@@ -144,6 +152,7 @@ public class DSClient {
 		send_and_wait("OK");
 	}
 
+	// Get the server based on the Largest-Round-Robin algorithm
 	private ServerListEntry get_server_lrr() {
 		// if we don't have a list of largest servers, create one
 		if (m_lrr_servers == null) {
@@ -161,6 +170,11 @@ public class DSClient {
 					m_lrr_servers.add(server);
 				}
 			}
+		}
+
+		if( !PERFECT_WORLD )
+		{
+			// TODO update LRR servers with latest changes
 		}
 
 		// return our current server
@@ -215,7 +229,7 @@ public class DSClient {
 		String response = client.send_and_wait("REDY");
 		while (!response.equals("NONE")) {
 			if (response.startsWith("JCPL")) { // Job completion msg
-				// TODO nothing?
+				// TODO something?
 			} else if (response.startsWith("JOBN")) { // Job to be scheduled
 				client.schedule_job(response, AlgorthimType.ALG_LRR);
 			}
