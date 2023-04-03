@@ -118,7 +118,7 @@ public class DSClient {
 
 	public void disconnect() throws IOException {
 		String quit_response = send_and_wait("QUIT");
-		if (!quit_response.equals("OK")) {
+		if (!quit_response.equals("QUIT")) {
 			error_mismatch("QUIT", quit_response);
 		}
 	}
