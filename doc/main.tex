@@ -163,7 +163,7 @@ The primary steps taken by the client are as follows:
 	\item \textbf{Establish connection with server}: This is the first action taken by the client where the socket connection is established.
 	\item\textbf{Handshake with server}: The handshake is performed, and a username is used to authorize the connection.
 	\item\textbf{Send REDY}: The client sends a message to the server indicating that it is ready to receive a new message.
-	\item\textbf{Message recieved}: A decision is made depending on the message received. If a new job message is received, it is scheduled using the LRR scheduler. A job completed message is currently ignored, and a "none" message starts the disconnection process.
+	\item\textbf{Message recieved}: A decision is made depending on the message received. If a new job message is received, it is scheduled using the LRR scheduler. A job completed message is currently ignored, and a \texttt{NONE} message starts the disconnection process.
 	\item\textbf{Schedule job}: The job received is taken and scheduled using the LRR scheduler. Within this process, a request is sent to the server to return servers capable of handling the job to be scheduled.
 	\item\textbf{Disconnect from server}: The client sends an exit message and waits for the response.
 	\item\textbf{Shutdown connection}: The socket connection is closed.
@@ -172,7 +172,7 @@ The primary steps taken by the client are as follows:
 
 \subsection{Technology}
 The client was written in Java with no addition non-default libraries, except for the ArrayList class which is part of the Java standard library.
-For quickly building and testing the program, I created a Makefile that allows for quick compilation and testing of the program. By default, the Makefile compiles and runs the program, but I also provided options to perform these tasks individually and one for testing using the provided test files.
+For quickly building and testing the program, I created a Makefile. By default, the Makefile compiles and runs the program, but I also provided options to perform these tasks individually and one for testing using the provided test files.
 
 \subsection{Data structures}
 \begin{itemize}
