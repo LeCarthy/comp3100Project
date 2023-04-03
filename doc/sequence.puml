@@ -1,0 +1,23 @@
+@startuml
+Client -> Server: Handshake Request
+Server --> Client: Handshake Response
+Client -> Server: Authentication Request
+Server --> Client: Authentication Response
+
+loop
+    Client -> Server: Ready for new message
+
+	group Reponse type
+	 Server --> Client: New job
+	 Client -> Server: Schedule job
+	else
+	 Server --> Client: Job completed
+	else
+	 Server --> Client: No jobs remaining
+	end
+end
+
+Client -> Server: Quit Request
+Server --> Client: Quit Response
+
+@enduml
